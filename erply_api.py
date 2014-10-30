@@ -39,8 +39,12 @@ class Erply(object):
     def session(self):
         def authenticate():
             response = self.verifyUser(**self.auth.data)
-            # TODO: handle response
-            raise NotImplementedError
+            if response.error:
+                print("Authentication failed with code {}".format(response.error))
+                raise ValueError
+            key = response.records.pop().get('sessionKey', None)
+            self._key = key
+            return key
         return self._key if self._key else authenticate()
 
     @property
@@ -57,14 +61,14 @@ class Erply(object):
 
     def handle_get(self, request, _page=None, _response=None, *args, **kwargs):
         data = dict(request=request)
-        data.update(self._payload if request == 'verifyUser' else self.payload)
+        data.update(self.payload if request != 'verifyUser' else self._payload)
         data.update(kwargs)
         if _page:
             data['pageNo'] = _page + 1
         r = requests.post(self.api_url, data=data, headers=self.headers)
         if _response:
-            _response.update(r.json(), _page)
-        return ErplyResponse(self, r.json(), _page)
+            _response.update(r, _page)
+        return ErplyResponse(self, r, _page)
 
     def __getattr__(self, attr):
         if attr in self.ERPLY_GET:
@@ -79,10 +83,25 @@ class Erply(object):
 
 class ErplyResponse(object):
 
-    def __init__(self, erply, data, page):
-        print data
-        print page
+    def __init__(self, erply, r, page):
+        self.erply = erply
+        self.error = None
 
+        if r.status_code != requests.codes.ok:
+            print ('Request failed with error code {}'.format(r.status_code))
+            raise ValueError
+
+        data = r.json()
+        status = data.get('status', {})
+
+        if not status:
+            print ("Malformed response")
+            raise ValueError
+
+        self.status = status.get('responseStatus')
+        self.error = status.get('errorCode')
+
+        self.records = data.get('records')
 
 class ErplyPagedResult(object):
     pass
