@@ -59,12 +59,14 @@ class Erply(object):
     def headers(self):
         return { 'Content-Type': 'application/x-www-form-urlencoded' }
 
-    def handle_get(self, request, _page=None, _response=None, *args, **kwargs):
+    def handle_get(self, request, _page=None, _per_page=None, _response=None, *args, **kwargs):
         data = dict(request=request)
         data.update(self.payload if request != 'verifyUser' else self._payload)
         data.update(kwargs)
         if _page:
             data['pageNo'] = _page + 1
+        if _per_page:
+            data['recordsOnPage'] = _per_page
         r = requests.post(self.api_url, data=data, headers=self.headers)
         if _response:
             _response.update(r, _page)
@@ -114,7 +116,7 @@ class ErplyResponse(object):
         raise ValueError
 
     def fetch_records(self, page):
-        self.erply.handle_get(self.request, _page=page, _response=self)
+        self.erply.handle_get(self.request, _page=page, _per_page=self.per_page, _response=self)
 
     def update(self, data, page):
         items = data.json().get('records')
