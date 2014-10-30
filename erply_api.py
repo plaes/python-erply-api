@@ -42,7 +42,7 @@ class Erply(object):
             if response.error:
                 print("Authentication failed with code {}".format(response.error))
                 raise ValueError
-            key = response.records.pop().get('sessionKey', None)
+            key = response.fetchone().get('sessionKey', None)
             self._key = key
             return key
         return self._key if self._key else authenticate()
@@ -68,12 +68,12 @@ class Erply(object):
         r = requests.post(self.api_url, data=data, headers=self.headers)
         if _response:
             _response.update(r, _page)
-        return ErplyResponse(self, r, _page)
+        return ErplyResponse(self, r, request, _page)
 
     def __getattr__(self, attr):
         if attr in self.ERPLY_GET:
             def method(*args, **kwargs):
-                _page = kwargs.get('_page', None)
+                _page = kwargs.get('_page', 0)
                 _response = kwargs.get('_response', None)
                 return self.handle_get(attr, _page, _response, *args, **kwargs)
             self.__dict__[attr] = method
@@ -83,7 +83,8 @@ class Erply(object):
 
 class ErplyResponse(object):
 
-    def __init__(self, erply, r, page):
+    def __init__(self, erply, r, request, page=0):
+        self.request = request
         self.erply = erply
         self.error = None
 
@@ -98,18 +99,33 @@ class ErplyResponse(object):
             print ("Malformed response")
             raise ValueError
 
-        self.status = status.get('responseStatus')
         self.error = status.get('errorCode')
 
-        self.records = data.get('records')
+        # Paginate results
+        self.page = page
+        self.total = status.get('recordsTotal')
+        self.per_page = status.get('recordsInResponse')
 
-class ErplyPagedResult(object):
-    pass
+        self.records = { page: data.get('records')}
 
+    def fetchone(self):
+        if self.total == 1:
+            return self.records[0][0]
+        raise ValueError
 
-class ErplyCSVResult(object):
-    pass
+    def fetch_records(self, page):
+        self.erply.handle_get(self.request, _page=page, _response=self)
 
+    def update(self, data, page):
+        items = data.json().get('records')
+        assert len(items) != 0
+        self.records[page] = items
 
-class ErplyResult(object):
-    pass
+    def __getitem__(self, key):
+        if isinstance(key, slice):
+            raise NotImplementedError
+        if self.per_page * key > self.total:
+            raise IndexError
+        if key not in self.records:
+            self.fetch_records(key)
+        return self.records[key]
