@@ -143,7 +143,7 @@ class ErplyResponse(object):
     def __getitem__(self, key):
         if isinstance(key, slice):
             raise NotImplementedError
-        if self.per_page * key > self.total:
+        if self.per_page * key >= self.total:
             raise IndexError
         if key not in self.records:
             self.fetch_records(key)
