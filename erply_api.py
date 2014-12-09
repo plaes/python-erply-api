@@ -132,6 +132,15 @@ class ErplyResponse(object):
 
         self.error = status.get('errorCode')
 
+        if self.error == 0:
+            self.error_desc = None
+        elif self.error == 1011:
+            self.error_desc = 'Invalid input: {}.'.format(status.get('errorField'))
+        elif self.error == 1012:
+            self.error_desc = 'Input {} must be unique.'.format(status.get('errorField'))
+        else:
+            self.error_desc = 'Response error code: {}.'.format(self.error)
+
         # Paginate results
         self.page = page
         self.total = status.get('recordsTotal')
