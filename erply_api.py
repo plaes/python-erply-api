@@ -30,6 +30,7 @@ class Erply(object):
 
     ERPLY_GET = ('getCustomerGroups', 'getCustomers', 'getDocuments', 'getProducts', 'verifyUser')
     ERPLY_CSV = ('getProductStockCSV',)
+    ERPLY_POST = ('saveProduct',)
 
     def __init__(self, auth):
         self.auth = auth
@@ -82,6 +83,13 @@ class Erply(object):
             _response.update(r, _page)
         return ErplyResponse(self, r, request, _page)
 
+    def handle_post(self, request, *args, **kwargs):
+        data = dict(request=request)
+        data.update(self.payload)
+        data.update(**kwargs)
+        r = requests.post(self.api_url, data=data, headers=self.headers)
+        return ErplyResponse(self, r, request)
+
     def __getattr__(self, attr):
         _attr = None
         if attr in self.ERPLY_GET:
@@ -93,6 +101,10 @@ class Erply(object):
         elif attr in self.ERPLY_CSV:
             def method(*args, **kwargs):
                 return self.handle_csv(attr.replace('CSV', ''), *args, **kwargs)
+            _attr = method
+        elif attr in self.ERPLY_POST:
+            def method(*args, **kwargs):
+                return self.handle_post(attr, *args, **kwargs)
             _attr = method
         if _attr:
             self.__dict__[attr] = _attr
