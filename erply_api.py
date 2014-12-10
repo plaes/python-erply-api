@@ -30,6 +30,7 @@ class Erply(object):
 
     ERPLY_GET = ('getCustomerGroups', 'getCustomers', 'getDocuments', 'getProducts', 'verifyUser')
     ERPLY_CSV = ('getProductStockCSV',)
+    ERPLY_POST = ('saveProduct',)
 
     def __init__(self, auth):
         self.auth = auth
@@ -82,6 +83,13 @@ class Erply(object):
             _response.update(r, _page)
         return ErplyResponse(self, r, request, _page)
 
+    def handle_post(self, request, *args, **kwargs):
+        data = dict(request=request)
+        data.update(self.payload)
+        data.update(**kwargs)
+        r = requests.post(self.api_url, data=data, headers=self.headers)
+        return ErplyResponse(self, r, request)
+
     def __getattr__(self, attr):
         _attr = None
         if attr in self.ERPLY_GET:
@@ -93,6 +101,10 @@ class Erply(object):
         elif attr in self.ERPLY_CSV:
             def method(*args, **kwargs):
                 return self.handle_csv(attr.replace('CSV', ''), *args, **kwargs)
+            _attr = method
+        elif attr in self.ERPLY_POST:
+            def method(*args, **kwargs):
+                return self.handle_post(attr, *args, **kwargs)
             _attr = method
         if _attr:
             self.__dict__[attr] = _attr
@@ -119,6 +131,15 @@ class ErplyResponse(object):
             raise ValueError
 
         self.error = status.get('errorCode')
+
+        if self.error == 0:
+            self.error_desc = None
+        elif self.error == 1011:
+            self.error_desc = 'Invalid input: {}.'.format(status.get('errorField'))
+        elif self.error == 1012:
+            self.error_desc = 'Input {} must be unique.'.format(status.get('errorField'))
+        else:
+            self.error_desc = 'Response error code: {}.'.format(self.error)
 
         # Paginate results
         self.page = page
