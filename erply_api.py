@@ -28,7 +28,8 @@ class ErplyAuth(object):
 
 class Erply(object):
 
-    ERPLY_GET = ('getCustomerGroups', 'getCustomers', 'getDocuments', 'getProducts', 'verifyUser')
+    ERPLY_GET = ('getCustomerGroups', 'getCustomers', 'getDocuments', \
+                 'getProducts', 'getSalesDocuments', 'verifyUser')
     ERPLY_CSV = ('getProductStockCSV',)
     ERPLY_POST = ('saveProduct',)
 
