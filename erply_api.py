@@ -28,8 +28,25 @@ class ErplyAuth(object):
 
 class Erply(object):
 
-    ERPLY_GET = ('getCustomerGroups', 'getCustomers', 'getDocuments', \
-                 'getProducts', 'getSalesDocuments', 'verifyUser')
+    ERPLY_GET = (
+        # TODO: This list is still incomplete
+         'getAddresses'
+        ,'getAddressTypes'
+        ,'getCustomers'
+        ,'getCustomerGroups'
+        ,'getProducts'
+        ,'getProductCategories'
+        ,'getProductCostForSpecificAmount'     # untested
+        ,'getProductGroups'
+        ,'getProductPrices'                    # untested, broken ??
+        ,'getProductPriorityGroups'            # untested
+        ,'getProductStock'                     # untested
+        ,'getProductUnits'
+        ,'getSalesDocuments'
+        ,'getServices'
+        # ,'getDocuments'       Unimplemented from ERPLY side :(
+        ,'verifyUser'
+    )
     ERPLY_CSV = ('getProductStockCSV',)
     ERPLY_POST = ('saveProduct',)
 
