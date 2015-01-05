@@ -99,14 +99,14 @@ class Erply(object):
         r = requests.post(self.api_url, data=data, headers=self.headers)
         if _response:
             _response.update(r, _page)
-        return ErplyResponse(self, r, request, _page)
+        return ErplyResponse(self, r, request, _page, *args, **kwargs)
 
     def handle_post(self, request, *args, **kwargs):
         data = dict(request=request)
         data.update(self.payload)
         data.update(**kwargs)
         r = requests.post(self.api_url, data=data, headers=self.headers)
-        return ErplyResponse(self, r, request)
+        return ErplyResponse(self, r, request, *args, **kwargs)
 
     def __getattr__(self, attr):
         _attr = None
@@ -132,10 +132,12 @@ class Erply(object):
 
 class ErplyResponse(object):
 
-    def __init__(self, erply, response, request, page=0):
+    def __init__(self, erply, response, request, page=0, *args, **kwargs):
         self.request = request
         self.erply = erply
         self.error = None
+
+        self.kwargs = kwargs
 
         if response.status_code != requests.codes.ok:
             print ('Request failed with error code {}'.format(response.status_code))
@@ -172,12 +174,12 @@ class ErplyResponse(object):
         raise ValueError
 
     def fetch_records(self, page):
-        self.erply.handle_get(self.request, _page=page, _per_page=self.per_page, _response=self)
+        self.erply.handle_get(self.request, _page=page, _per_page=self.per_page, _response=self, **self.kwargs)
 
     def update(self, data, page):
         items = data.json().get('records')
-        assert len(items) != 0
-        self.records[page] = items
+        if len(items):
+            self.records[page] = items
 
     def __getitem__(self, key):
         if isinstance(key, slice):
