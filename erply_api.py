@@ -89,19 +89,26 @@ class Erply(object):
         return ErplyCSVResponse(self, requests.post(self.api_url, data=data, headers=self.headers))
 
     def handle_get(self, request, _page=None, _per_page=None, _response=None, *args, **kwargs):
-        data = dict(request=request)
-        data.update(self.payload if request != 'verifyUser' else self._payload)
-        data.update(kwargs)
+        _is_bulk = kwargs.pop('_is_bulk', False)
+        data = kwargs
         if _page:
             data['pageNo'] = _page + 1
         if _per_page:
             data['recordsOnPage'] = _per_page
+        if _is_bulk:
+            data.update(requestName=request)
+            return data
+        data = update(request=request)
+        data.update(self.payload if request != 'verifyUser' else self._payload)
         r = requests.post(self.api_url, data=data, headers=self.headers)
         if _response:
             _response.update(r, _page)
         return ErplyResponse(self, r, request, _page, *args, **kwargs)
 
     def handle_post(self, request, *args, **kwargs):
+        _is_bulk = kwargs.pop('_is_bulk', False)
+        if _is_bulk:
+            raise NotImplementedError
         data = dict(request=request)
         data.update(self.payload)
         data.update(**kwargs)
@@ -110,24 +117,44 @@ class Erply(object):
 
     def __getattr__(self, attr):
         _attr = None
+        _is_bulk = len(attr) > 5 and attr.endswith('_bulk')
+        if _is_bulk:
+            attr = attr[:-5]
         if attr in self.ERPLY_GET:
             def method(*args, **kwargs):
                 _page = kwargs.get('_page', 0)
                 _response = kwargs.get('_response', None)
-                return self.handle_get(attr, _page, _response, *args, **kwargs)
+                return self.handle_get(attr, _page, _response, _is_bulk=_is_bulk, *args, **kwargs)
+            _attr = method
+        elif attr in self.ERPLY_POST:
+            def method(*args, **kwargs):
+                return self.handle_post(attr, _is_bulk=_is_bulk, *args, **kwargs)
             _attr = method
         elif attr in self.ERPLY_CSV:
             def method(*args, **kwargs):
                 return self.handle_csv(attr.replace('CSV', ''), *args, **kwargs)
             _attr = method
-        elif attr in self.ERPLY_POST:
-            def method(*args, **kwargs):
-                return self.handle_post(attr, *args, **kwargs)
-            _attr = method
         if _attr:
             self.__dict__[attr] = _attr
             return _attr
         raise AttributeError
+
+
+class ErplyBulkRequest(object):
+    def __init__(self, erply):
+        self.calls = []
+        self.erply = erply
+
+    def attach(self, attr, *args, **kwargs):
+        if attr in self.erply.ERPLY_GET or attr in self.erply.ERPLY_POST:
+            self.calls.append((getattr(self.erply, '{}_bulk'.format(attr)), args, kwargs))
+
+    def __call__(self):
+        # TODO: do the proper request and process the results
+        for n, request in enumerate(self.calls, start=1):
+            _call, _args, _kwargs = request
+            _kwargs.update(requestID=n)
+            print (_call(*_args, **_kwargs))
 
 
 class ErplyResponse(object):
