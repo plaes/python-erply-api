@@ -88,13 +88,11 @@ class Erply(object):
         data.update(**kwargs)
         return ErplyCSVResponse(self, requests.post(self.api_url, data=data, headers=self.headers))
 
-    def handle_get(self, request, _page=None, _per_page=None, _response=None, *args, **kwargs):
+    def handle_get(self, request, _page=None, _response=None, *args, **kwargs):
         _is_bulk = kwargs.pop('_is_bulk', False)
         data = kwargs.copy()
         if _page:
             data['pageNo'] = _page + 1
-        if _per_page:
-            data['recordsOnPage'] = _per_page
         if _is_bulk:
             data.update(requestName=request)
             return data
@@ -199,7 +197,7 @@ class ErplyResponse(object):
         # Paginate results
         self.page = page
         self.total = status.get('recordsTotal')
-        self.per_page = status.get('recordsInResponse')
+        self.per_page = status.get('recordsInResponse', 0)
 
         self.records = { page: data.get('records')}
 
@@ -209,11 +207,12 @@ class ErplyResponse(object):
         raise ValueError
 
     def fetch_records(self, page):
-        self.erply.handle_get(self.request, _page=page, _per_page=self.per_page, _response=self, **self.kwargs)
+        self.erply.handle_get(self.request, _page=page, _response=self, **self.kwargs)
 
     def update(self, data, page):
         items = data.json().get('records')
         if items:
+            assert self.per_page != 0
             self.records[page] = items
 
     def __getitem__(self, key):
