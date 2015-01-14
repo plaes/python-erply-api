@@ -170,6 +170,10 @@ class ErplyResponse(object):
         self.erply = erply
         self.error = None
 
+        # Result pagination setup
+        self.page = page
+        self.per_page = kwargs.get('recordsOnPage', 20)
+
         self.kwargs = kwargs
 
         if response.status_code != requests.codes.ok:
@@ -194,11 +198,7 @@ class ErplyResponse(object):
         else:
             self.error_desc = 'Response error code: {}.'.format(self.error)
 
-        # Paginate results
-        self.page = page
         self.total = status.get('recordsTotal')
-        self.per_page = status.get('recordsInResponse', 0)
-
         self.records = { page: data.get('records')}
 
     def fetchone(self):
