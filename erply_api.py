@@ -213,7 +213,7 @@ class ErplyResponse(object):
 
     def update(self, data, page):
         items = data.json().get('records')
-        if len(items):
+        if items:
             self.records[page] = items
 
     def __getitem__(self, key):
