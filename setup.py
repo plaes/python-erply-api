@@ -9,7 +9,7 @@ from distutils.core import setup
 
 setup(
     name='ErplyAPI',
-    version='0.2015.01.07-dev',
+    version='0.2015.01.16',
     description='Python wrapper for Erply API',
     license='BSD',
     author='Priit Laes',
