@@ -34,6 +34,7 @@ class Erply(object):
         ,'getAddressTypes'
         ,'getCustomers'
         ,'getCustomerGroups'
+        # ,'getDocuments'       Unimplemented from ERPLY side :(
         ,'getProducts'
         ,'getProductCategories'
         ,'getProductCostForSpecificAmount'     # untested
@@ -43,9 +44,9 @@ class Erply(object):
         ,'getProductStock'                     # untested
         ,'getProductUnits'
         ,'getSalesDocuments'
-        ,'getServices'
         ,'getSalesReport'                   # TODO: This is actually a CSV request :S
-        # ,'getDocuments'       Unimplemented from ERPLY side :(
+        ,'getServices'
+        ,'getWarehouses'
         ,'verifyUser'
     )
     ERPLY_CSV = ('getProductStockCSV',)
