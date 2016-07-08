@@ -44,6 +44,7 @@ class Erply(object):
         ,'getProductUnits'
         ,'getSalesDocuments'
         ,'getServices'
+        ,'getWarehouses'
         ,'getSalesReport'                   # TODO: This is actually a CSV request :S
         # ,'getDocuments'       Unimplemented from ERPLY side :(
         ,'verifyUser'
