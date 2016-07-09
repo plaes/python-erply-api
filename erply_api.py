@@ -103,7 +103,7 @@ class Erply(object):
         data.update(self.payload if request != 'verifyUser' else self._payload)
         r = requests.post(self.api_url, data=data, headers=self.headers)
         if _response:
-            _response.update(r, _page)
+            _response.populate_page(r, _page)
         return ErplyResponse(self, r, request, _page, *args, **kwargs)
 
     def handle_post(self, request, *args, **kwargs):
@@ -212,8 +212,8 @@ class ErplyResponse(object):
     def fetch_records(self, page):
         self.erply.handle_get(self.request, _page=page, _response=self, **self.kwargs)
 
-    def update(self, data, page):
-        items = data.json().get('records')
+    def populate_page(self, response, page):
+        items = response.json().get('records')
         if items:
             assert self.per_page != 0
             self.records[page] = items
