@@ -14,6 +14,9 @@ import csv
 import requests
 
 
+class ErplyException(Exception):
+    pass
+
 class ErplyAuth(object):
 
     def __init__(self, code, username, password):
@@ -195,15 +198,17 @@ class ErplyResponse(object):
 
         if self.error == 0:
             self.error_desc = None
-        elif self.error == 1011:
-            self.error_desc = 'Invalid input: {}.'.format(status.get('errorField'))
-        elif self.error == 1012:
-            self.error_desc = 'Input {} must be unique.'.format(status.get('errorField'))
-        else:
-            self.error_desc = 'Response error code: {}.'.format(self.error)
+            self.total = status.get('recordsTotal')
+            self.records = { page: data.get('records')}
+            return
 
-        self.total = status.get('recordsTotal')
-        self.records = { page: data.get('records')}
+        field = status.get('errorField')
+
+        if field:
+            raise ErplyException('Erply error: {}, field: {}'.format(self.error, field))
+
+        raise ErplyException('Erply error{}'.format(self.error))
+
 
     def fetchone(self):
         if self.total == 1:
