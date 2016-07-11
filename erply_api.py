@@ -44,6 +44,7 @@ class Erply(object):
         ,'getProductStock'                     # untested
         ,'getProductUnits'
         ,'getPurchaseDocuments'
+        ,'getReports'
         ,'getSalesDocuments'
         ,'getSalesReport'                   # TODO: This is actually a CSV request :S
         ,'getServices'
