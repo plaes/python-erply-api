@@ -46,12 +46,11 @@ class Erply(object):
         ,'getPurchaseDocuments'
         ,'getReports'
         ,'getSalesDocuments'
-        ,'getSalesReport'                   # TODO: This is actually a CSV request :S
         ,'getServices'
         ,'getWarehouses'
         ,'verifyUser'
     )
-    ERPLY_CSV = ('getProductStockCSV',)
+    ERPLY_CSV = ('getProductStockCSV','getSalesReport')
     ERPLY_POST = ('saveProduct',)
 
     def __init__(self, auth):
