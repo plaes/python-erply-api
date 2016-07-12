@@ -244,7 +244,6 @@ class ErplyCSVResponse(object):
             raise ValueError
 
         self.error = status.get('errorCode')
-
         self.url = data.get('records').pop().get('reportLink')
         self.timestamp = datetime.fromtimestamp(status.get('requestUnixTime'))
 
