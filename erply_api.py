@@ -49,12 +49,11 @@ class Erply(object):
         ,'getPurchaseDocuments'
         ,'getReports'
         ,'getSalesDocuments'
-        ,'getSalesReport'                   # TODO: This is actually a CSV request :S
         ,'getServices'
         ,'getWarehouses'
         ,'verifyUser'
     )
-    ERPLY_CSV = ('getProductStockCSV',)
+    ERPLY_CSV = ('getProductStockCSV', 'getSalesReport')
     ERPLY_POST = ('saveProduct',)
 
     def __init__(self, auth):
@@ -259,9 +258,9 @@ class ErplyCSVResponse(object):
         with closing(requests.get(self.url, stream=True)) as f:
             if f.status_code != requests.codes.ok:
                 raise ValueError
-            reader = csv.reader(f.text.splitlines())
-            reader.next()
-            return reader
+            # XXX: Check whether we have to make it configurable...
+            # XXX: Should we remove header and footer?
+            return csv.reader(f.text.splitlines(), delimiter=';')
 
 
 class ErplyBulkResponse(object):
