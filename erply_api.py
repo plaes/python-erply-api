@@ -196,13 +196,11 @@ class ErplyResponse(object):
         self.error = status.get('errorCode')
 
         if self.error == 0:
-            self.error_desc = None
             self.total = status.get('recordsTotal')
             self.records = { page: data.get('records')}
             return
 
         field = status.get('errorField')
-
         if field:
             raise ErplyException('Erply error: {}, field: {}'.format(self.error, field))
 
@@ -250,8 +248,17 @@ class ErplyCSVResponse(object):
 
         self.error = status.get('errorCode')
 
-        self.url = data.get('records').pop().get('reportLink')
-        self.timestamp = datetime.fromtimestamp(status.get('requestUnixTime'))
+        if self.error == 0:
+            self.url = data.get('records').pop().get('reportLink')
+            self.timestamp = datetime.fromtimestamp(status.get('requestUnixTime'))
+            return
+
+        field = status.get('errorField')
+        if field:
+            raise ErplyException('Erply error: {}, field: {}'.format(self.error, field))
+
+        raise ErplyException('Erply error{}'.format(self.error))
+
 
     @property
     def records(self):
