@@ -1,4 +1,6 @@
 # -*- coding: utf-8 -*-
+from datetime import timedelta
+from datetime import datetime
 """
     erply
     ~~~~~
@@ -13,6 +15,9 @@ from datetime import datetime
 import csv
 import requests
 
+
+class ErplyException(Exception):
+    pass
 
 class ErplyAuth(object):
 
@@ -50,12 +55,13 @@ class Erply(object):
         ,'getWarehouses'
         ,'verifyUser'
     )
-    ERPLY_CSV = ('getProductStockCSV','getSalesReport')
+    ERPLY_CSV = ('getProductStockCSV', 'getSalesReport')
     ERPLY_POST = ('saveProduct',)
 
     def __init__(self, auth):
         self.auth = auth
         self._key = None
+        self.valid_until = datetime.fromtimestamp(0)
 
     @property
     def _payload(self):
@@ -69,12 +75,19 @@ class Erply(object):
                 print("Authentication failed with code {}".format(response.error))
                 raise ValueError
             key = response.fetchone().get('sessionKey', None)
+            print (key)
             self._key = key
+            self.valid_until = datetime.now() + timedelta(minutes=59, seconds=30)
             return key
         return self._key if self._key else authenticate()
 
     @property
     def payload(self):
+        #print ("now", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+        print ("valid_until", self.valid_until)
+        if not datetime.now() < self.valid_until:
+            self._key = None
+            self.session
         return dict(sessionKey=self.session, **self._payload)
 
     @property
@@ -103,7 +116,7 @@ class Erply(object):
         data.update(self.payload if request != 'verifyUser' else self._payload)
         r = requests.post(self.api_url, data=data, headers=self.headers)
         if _response:
-            _response.update(r, _page)
+            _response.populate_page(r, _page)
         return ErplyResponse(self, r, request, _page, *args, **kwargs)
 
     def handle_post(self, request, *args, **kwargs):
@@ -193,16 +206,16 @@ class ErplyResponse(object):
         self.error = status.get('errorCode')
 
         if self.error == 0:
-            self.error_desc = None
-        elif self.error == 1011:
-            self.error_desc = 'Invalid input: {}.'.format(status.get('errorField'))
-        elif self.error == 1012:
-            self.error_desc = 'Input {} must be unique.'.format(status.get('errorField'))
-        else:
-            self.error_desc = 'Response error code: {}.'.format(self.error)
+            self.total = status.get('recordsTotal')
+            self.records = { page: data.get('records')}
+            return
 
-        self.total = status.get('recordsTotal')
-        self.records = { page: data.get('records')}
+        field = status.get('errorField')
+        if field:
+            raise ErplyException('Erply error: {}, field: {}'.format(self.error, field))
+
+        raise ErplyException('Erply error{}'.format(self.error))
+
 
     def fetchone(self):
         if self.total == 1:
@@ -212,8 +225,8 @@ class ErplyResponse(object):
     def fetch_records(self, page):
         self.erply.handle_get(self.request, _page=page, _response=self, **self.kwargs)
 
-    def update(self, data, page):
-        items = data.json().get('records')
+    def populate_page(self, response, page):
+        items = response.json().get('records')
         if items:
             assert self.per_page != 0
             self.records[page] = items
@@ -244,17 +257,27 @@ class ErplyCSVResponse(object):
             raise ValueError
 
         self.error = status.get('errorCode')
-        self.url = data.get('records').pop().get('reportLink')
-        self.timestamp = datetime.fromtimestamp(status.get('requestUnixTime'))
+
+        if self.error == 0:
+            self.url = data.get('records').pop().get('reportLink')
+            self.timestamp = datetime.fromtimestamp(status.get('requestUnixTime'))
+            return
+
+        field = status.get('errorField')
+        if field:
+            raise ErplyException('Erply error: {}, field: {}'.format(self.error, field))
+
+        raise ErplyException('Erply error{}'.format(self.error))
+
 
     @property
     def records(self):
         with closing(requests.get(self.url, stream=True)) as f:
             if f.status_code != requests.codes.ok:
                 raise ValueError
-            reader = csv.reader(f.text.splitlines())
-            reader.next()
-            return reader
+            # XXX: Check whether we have to make it configurable...
+            # XXX: Should we remove header and footer?
+            return csv.reader(f.text.splitlines(), delimiter=';')
 
 
 class ErplyBulkResponse(object):
