@@ -40,6 +40,7 @@ class Erply(object):
         ,'getCustomers'
         ,'getCustomerGroups'
         # ,'getDocuments'       Unimplemented from ERPLY side :(
+        ,'getEmployees'
         ,'getProducts'
         ,'getProductCategories'
         ,'getProductCostForSpecificAmount'     # untested
