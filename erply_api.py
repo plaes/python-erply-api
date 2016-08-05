@@ -17,6 +17,7 @@ import requests
 
 
 class ErplyException(Exception):
+    ###fcdsfsedcxwasd<zxcefdscx fdcx edscxzefdcsx f
     pass
 
 class ErplyAuth(object):
@@ -97,7 +98,7 @@ class Erply(object):
 
     @property
     def headers(self):
-        return { 'Content-Type': 'application/x-www-form-urlencoded' }
+        return { 'Content-Type': 'application/x-www-form-urlencoded'}
 
     def handle_csv(self, request, *args, **kwargs):
         data = dict(request=request, responseType='CSV')
@@ -116,8 +117,10 @@ class Erply(object):
         data.update(request=request)
         data.update(self.payload if request != 'verifyUser' else self._payload)
         r = requests.post(self.api_url, data=data, headers=self.headers)
+        #print (r.headers['Date'])
         if _response:
             _response.populate_page(r, _page)
+        ErplyResponse.serverDate(self, r)
         return ErplyResponse(self, r, request, _page, *args, **kwargs)
 
     def handle_post(self, request, *args, **kwargs):
@@ -129,6 +132,9 @@ class Erply(object):
         data.update(request=request)
         data.update(self.payload)
         r = requests.post(self.api_url, data=data, headers=self.headers)
+        print (r.headers['Date'])
+        
+        
         return ErplyResponse(self, r, request, *args, **kwargs)
 
     def handle_bulk(self, _requests):
@@ -186,6 +192,7 @@ class ErplyResponse(object):
         self.request = request
         self.erply = erply
         self.error = None
+        self.response = response
 
         # Result pagination setup
         self.page = page
@@ -213,9 +220,9 @@ class ErplyResponse(object):
 
         field = status.get('errorField')
         if field:
-            raise ErplyException('Erply error: {}, field: {}'.format(self.error, field))
+            raise ErplyException('{}, field: {}'.format(self.error, field))
 
-        raise ErplyException('Erply error{}'.format(self.error))
+        raise ErplyException('{}'.format(self.error))
 
 
     def fetchone(self):
@@ -231,7 +238,11 @@ class ErplyResponse(object):
         if items:
             assert self.per_page != 0
             self.records[page] = items
-
+    
+    def serverDate(self, response):
+        unixDate = response.json().get('status').get('requestUnixTime')
+        return {'UnixTime': unixDate}
+    
     def __getitem__(self, key):
         if isinstance(key, slice):
             raise NotImplementedError
@@ -266,9 +277,9 @@ class ErplyCSVResponse(object):
 
         field = status.get('errorField')
         if field:
-            raise ErplyException('Erply error: {}, field: {}'.format(self.error, field))
+            raise ErplyException('{}, field: {}'.format(self.error, field))
 
-        raise ErplyException('Erply error{}'.format(self.error))
+        raise ErplyException('{}'.format(self.error))
 
 
     @property
