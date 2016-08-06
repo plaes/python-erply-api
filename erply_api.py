@@ -107,7 +107,36 @@ class Erply(object):
         r = requests.post(self.api_url, data=data, headers=self.headers)
         if _response:
             _response.populate_page(r, _page)
-        return ErplyResponse(self, r, request, _page, *args, **kwargs)
+
+        # Parse result
+        if r.status_code != requests.codes.ok:
+            print ('Request failed with error code {}'.format(r.status_code))
+            raise ValueError
+
+        data = r.json()
+        status = data.get('status', {})
+
+        if not status:
+            print ("Malformed response")
+            raise ValueError
+
+        error = status.get('errorCode')
+        if error == 0:
+            return ErplyResponse(self, r, request, _page, *args, **kwargs)
+
+        # Session token expired, retry auth
+        if error == 1054:
+            # Clear existing token, to initiate reauth
+            self._key = None
+            return getattr(self, request)(request, *args, **kwargs)
+
+        # Check for other errors...
+        field = status.get('errorField')
+        if field:
+            raise ErplyException('Erply error: {}, field: {}'.format(self.error, field))
+
+        raise ErplyException('Erply error{}'.format(self.error))
+
 
     def handle_post(self, request, *args, **kwargs):
         _is_bulk = kwargs.pop('_is_bulk', False)
@@ -182,29 +211,11 @@ class ErplyResponse(object):
 
         self.kwargs = kwargs
 
-        if response.status_code != requests.codes.ok:
-            print ('Request failed with error code {}'.format(response.status_code))
-            raise ValueError
-
         data = response.json()
         status = data.get('status', {})
 
-        if not status:
-            print ("Malformed response")
-            raise ValueError
-
-        self.error = status.get('errorCode')
-
-        if self.error == 0:
-            self.total = status.get('recordsTotal')
-            self.records = { page: data.get('records')}
-            return
-
-        field = status.get('errorField')
-        if field:
-            raise ErplyException('Erply error: {}, field: {}'.format(self.error, field))
-
-        raise ErplyException('Erply error{}'.format(self.error))
+        self.total = status.get('recordsTotal')
+        self.records = { page: data.get('records')}
 
 
     def fetchone(self):
