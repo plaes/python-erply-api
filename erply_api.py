@@ -105,8 +105,6 @@ class Erply(object):
         data.update(request=request)
         data.update(self.payload if request != 'verifyUser' else self._payload)
         r = requests.post(self.api_url, data=data, headers=self.headers)
-        if _response:
-            _response.populate_page(r, _page)
 
         # Parse result
         if r.status_code != requests.codes.ok:
@@ -122,6 +120,9 @@ class Erply(object):
 
         error = status.get('errorCode')
         if error == 0:
+            if _response:
+                _response.populate_page(r, _page)
+
             return ErplyResponse(self, r, request, _page, *args, **kwargs)
 
         # Session token expired, retry auth
