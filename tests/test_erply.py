@@ -1,6 +1,8 @@
 import json
+import mock
 import unittest
 import requests_mock
+from datetime import datetime
 
 from erply_api import Erply, ErplyAuth
 
@@ -104,6 +106,25 @@ class TestErply(unittest.TestCase):
         assert m.request_history[2].text == m.request_history[4].text
 
         assert len(r.records[1]) == 1
+
+
+    @mock.patch('time.sleep', return_value=None)
+    def test_hourly_limit(self, m, time_sleep):
+        _elim_response = json.dumps({'status': {'requestUnixTime': 1470596233, 'responseStatus': 'error', 'recordsInResponse': 0, 'request': 'verifyUser', 'generationTime': 0.00347900390625, 'errorCode': 1002, 'recordsTotal': 0}})
+        _auth_response = json.dumps({"status":{"request":"verifyUser","requestUnixTime":1470506907,"responseStatus":"ok","errorCode":0,"generationTime":0.046638011932373,"recordsTotal":1,"recordsInResponse":1},"records":[{"userID":"6","userName":"demo","employeeID":"4","employeeName":"Clara Smith","groupID":"7","groupName":"sales representatives","sessionKey":"jVCn2ee69668699820b799fc80bc8a678e235fa3b363","sessionLength":3600,"loginUrl":"https:\/\/demo.erply.com\/eng\/","berlinPOSVersion":"3.17.2","berlinPOSAssetsURL":"http:\/\/assets.erply.com\/berlin\/","epsiURL":"https:\/\/app.erply.com\/epsi\/EPSI.jnlp"}]})
+        _customer_1 = json.dumps({"status":{"request":"getCustomers","requestUnixTime":1470506908,"responseStatus":"ok","errorCode":0,"generationTime":0.10754203796387,"recordsTotal":15,"recordsInResponse":1},"records":[{"id":7}]})
+
+        m.post('https://{}.erply.com/api/'.format(self.ERPLY_CUSTOMER_CODE), [
+            {'text': _elim_response},
+            {'text': _auth_response},
+            {'text': _customer_1},
+        ])
+
+        self.erply.getCustomers(**{'recordsOnPage': 1})
+
+        server_time = (60 * (60 - datetime.fromtimestamp(1470596233).minute)) + 1
+
+        time_sleep.assert_called_once_with(server_time)
 
 
 if __name__ == '__main__':

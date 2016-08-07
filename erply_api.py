@@ -117,15 +117,24 @@ class Erply(object):
         if error == 0:
             return False, data
 
+        elif error == 1002:
+            # TODO: Add option to sleep until next hour
+            from datetime import datetime
+            from time import sleep
+            # Calculate time to sleep until next hour
+            server_time = datetime.fromtimestamp(status.get('requestUnixTime'))
+            sleep((60 * (60 - server_time.minute)) + 1)
+            return True, None
+
         elif error == 1054:
             self._key = None
             return True, None
 
         field = status.get('errorField')
         if field:
-            raise ErplyException('Erply error: {}, field: {}'.format(self.error, field))
+            raise ErplyException('Erply error: {}, field: {}'.format(error, field))
 
-        raise ErplyException('Erply error: {}'.format(self.error))
+        raise ErplyException('Erply error: {}'.format(error))
 
 
     def handle_get(self, request, _page=None, _response=None, *args, **kwargs):
