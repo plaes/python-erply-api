@@ -94,6 +94,40 @@ class Erply(object):
         data.update(**kwargs)
         return ErplyCSVResponse(self, requests.post(self.api_url, data=data, headers=self.headers))
 
+    def _parse_response(self, resp, _initial_response=None):
+        """Parse API response.
+
+        Returns two-tuple containing: `retry` and `data` values:
+            - `retry` is boolean specifying whether session token was expired
+              and signalling caller to request new session token and redo the
+              API with original parameters.
+            - `data` - dictionary of original json-encoded response.
+        """
+        if resp.status_code != requests.codes.ok:
+            raise ValueError('Request failed with error {}'.format(resp.status_code))
+
+        data = resp.json()
+        status = data.get('status', {})
+
+        if not status:
+            raise ValueError('Malformed response')
+
+        error = status.get('errorCode')
+
+        if error == 0:
+            return False, data
+
+        elif error == 1054:
+            self._key = None
+            return True, None
+
+        field = status.get('errorField')
+        if field:
+            raise ErplyException('Erply error: {}, field: {}'.format(self.error, field))
+
+        raise ErplyException('Erply error: {}'.format(self.error))
+
+
     def handle_get(self, request, _page=None, _response=None, *args, **kwargs):
         _is_bulk = kwargs.pop('_is_bulk', False)
         data = kwargs.copy()
@@ -106,37 +140,17 @@ class Erply(object):
         data.update(self.payload if request != 'verifyUser' else self._payload)
         r = requests.post(self.api_url, data=data, headers=self.headers)
 
-        # Parse result
-        if r.status_code != requests.codes.ok:
-            print ('Request failed with error code {}'.format(r.status_code))
-            raise ValueError
+        retry, parsed_data = self._parse_response(r)
 
-        data = r.json()
-        status = data.get('status', {})
+        # Retry request in case of token expiration
+        if retry:
+            return getattr(self, request)(request, _page=_page, _response=_response, *args, **kwargs)
 
-        if not status:
-            print ("Malformed response")
-            raise ValueError
+        if _response:
+            # TODO: use already parsed data...
+            _response.populate_page(r, _page)
 
-        error = status.get('errorCode')
-        if error == 0:
-            if _response:
-                _response.populate_page(r, _page)
-
-            return ErplyResponse(self, r, request, _page, *args, **kwargs)
-
-        # Session token expired, retry auth
-        if error == 1054:
-            # Clear existing token, to initiate reauth
-            self._key = None
-            return getattr(self, request)(request, *args, **kwargs)
-
-        # Check for other errors...
-        field = status.get('errorField')
-        if field:
-            raise ErplyException('Erply error: {}, field: {}'.format(self.error, field))
-
-        raise ErplyException('Erply error{}'.format(self.error))
+        return ErplyResponse(self, r, request, _page, *args, **kwargs)
 
 
     def handle_post(self, request, *args, **kwargs):
@@ -162,8 +176,8 @@ class Erply(object):
             attr = attr[:-5]
         if attr in self.ERPLY_GET:
             def method(*args, **kwargs):
-                _page = kwargs.get('_page', 0)
-                _response = kwargs.get('_response', None)
+                _page = kwargs.pop('_page', 0)
+                _response = kwargs.pop('_response', None)
                 return self.handle_get(attr, _page, _response, _is_bulk=_is_bulk, *args, **kwargs)
             _attr = method
         elif attr in self.ERPLY_POST:
