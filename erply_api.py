@@ -147,8 +147,7 @@ class Erply(object):
             return getattr(self, request)(request, _page=_page, _response=_response, *args, **kwargs)
 
         if _response:
-            # TODO: use already parsed data...
-            _response.populate_page(r, _page)
+            _response.populate_page(parsed_data.get('records'), _page)
 
         return ErplyResponse(self, r, request, _page, *args, **kwargs)
 
@@ -241,11 +240,9 @@ class ErplyResponse(object):
     def fetch_records(self, page):
         self.erply.handle_get(self.request, _page=page, _response=self, **self.kwargs)
 
-    def populate_page(self, response, page):
-        items = response.json().get('records')
-        if items:
-            assert self.per_page != 0
-            self.records[page] = items
+    def populate_page(self, data, page):
+        assert self.per_page != 0
+        self.records[page] = data
 
     def __getitem__(self, key):
         if isinstance(key, slice):

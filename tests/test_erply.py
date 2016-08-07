@@ -90,13 +90,20 @@ class TestErply(unittest.TestCase):
 
         it = iter(r)
         next(it)
+        # 2 calls: auth + request
         assert m.call_count == 2
 
+        assert len(r.records[0]) == 1
+
+        # Fetch next page
         next(it)
+        # 3 calls: request fail + auth + re-request
         assert m.call_count == 5
 
         assert 'recordsOnPage' in m.request_history[2].text
         assert m.request_history[2].text == m.request_history[4].text
+
+        assert len(r.records[1]) == 1
 
 
 if __name__ == '__main__':
