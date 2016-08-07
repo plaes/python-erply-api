@@ -149,7 +149,7 @@ class Erply(object):
         if _response:
             _response.populate_page(parsed_data.get('records'), _page)
 
-        return ErplyResponse(self, r, request, _page, *args, **kwargs)
+        return ErplyResponse(self, parsed_data, request, _page, *args, **kwargs)
 
 
     def handle_post(self, request, *args, **kwargs):
@@ -161,7 +161,14 @@ class Erply(object):
         data.update(request=request)
         data.update(self.payload)
         r = requests.post(self.api_url, data=data, headers=self.headers)
-        return ErplyResponse(self, r, request, *args, **kwargs)
+
+        retry, parsed_data = self._parse_response(r)
+
+        # Retry request in case of token expiration
+        if retry:
+            return getattr(self, request)(request, *args, **kwargs)
+
+        return ErplyResponse(self, parsed_data, request, *args, **kwargs)
 
     def handle_bulk(self, _requests):
         data = self.payload
@@ -214,7 +221,7 @@ class ErplyBulkRequest(object):
 
 class ErplyResponse(object):
 
-    def __init__(self, erply, response, request, page=0, *args, **kwargs):
+    def __init__(self, erply, data, request, page=0, *args, **kwargs):
         self.request = request
         self.erply = erply
         self.error = None
@@ -225,7 +232,6 @@ class ErplyResponse(object):
 
         self.kwargs = kwargs
 
-        data = response.json()
         status = data.get('status', {})
 
         self.total = status.get('recordsTotal')
