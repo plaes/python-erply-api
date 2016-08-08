@@ -14,7 +14,6 @@ except ImportError:
     from urlparse import urlparse, parse_qs
 
 
-
 @requests_mock.Mocker()
 class TestErply(unittest.TestCase):
 
