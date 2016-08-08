@@ -4,7 +4,7 @@ import unittest
 import requests_mock
 from datetime import datetime
 
-from erply_api import Erply, ErplyAuth
+from erply_api import Erply, ErplyAuth, ErplyAPILimitException
 
 try:
     # Python 3
@@ -107,7 +107,7 @@ class TestErply(unittest.TestCase):
         assert len(r.records[1]) == 1
 
 
-    @mock.patch('time.sleep', return_value=None)
+    @mock.patch('erply_api.sleep', return_value=None)
     def test_hourly_limit(self, m, time_sleep):
         _elim_response = json.dumps({'status': {'requestUnixTime': 1470596233, 'responseStatus': 'error', 'recordsInResponse': 0, 'request': 'verifyUser', 'generationTime': 0.00347900390625, 'errorCode': 1002, 'recordsTotal': 0}})
         _auth_response = json.dumps({"status":{"request":"verifyUser","requestUnixTime":1470506907,"responseStatus":"ok","errorCode":0,"generationTime":0.046638011932373,"recordsTotal":1,"recordsInResponse":1},"records":[{"userID":"6","userName":"demo","employeeID":"4","employeeName":"Clara Smith","groupID":"7","groupName":"sales representatives","sessionKey":"jVCn2ee69668699820b799fc80bc8a678e235fa3b363","sessionLength":3600,"loginUrl":"https:\/\/demo.erply.com\/eng\/","berlinPOSVersion":"3.17.2","berlinPOSAssetsURL":"http:\/\/assets.erply.com\/berlin\/","epsiURL":"https:\/\/app.erply.com\/epsi\/EPSI.jnlp"}]})
@@ -119,12 +119,28 @@ class TestErply(unittest.TestCase):
             {'text': _customer_1},
         ])
 
+        # Mark wait_on_limit to True
+        self.erply.wait_on_limit = True
+
         self.erply.getCustomers(**{'recordsOnPage': 1})
 
         server_time = (60 * (60 - datetime.fromtimestamp(1470596233).minute)) + 1
 
         time_sleep.assert_called_once_with(server_time)
 
+        assert m.call_count == 3
+
+    def test_hourly_limit_exception(self, m):
+        _elim_response = json.dumps({'status': {'requestUnixTime': 1470596233, 'responseStatus': 'error', 'recordsInResponse': 0, 'request': 'verifyUser', 'generationTime': 0.00347900390625, 'errorCode': 1002, 'recordsTotal': 0}})
+
+        m.post('https://{}.erply.com/api/'.format(self.ERPLY_CUSTOMER_CODE), [
+            {'text': _elim_response},
+        ])
+
+        with self.assertRaises(ErplyAPILimitException):
+            self.erply.getCustomers(**{'recordsOnPage': 1})
+
+        assert m.call_count == 1
 
 if __name__ == '__main__':
     unittest.main()

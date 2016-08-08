@@ -5,17 +5,23 @@
 
     Simple Python wrapper for Erply API
 
-    :copyright: (c) 2014 by Priit Laes
+    :copyright: (c) 2014-2016 by Priit Laes
     :license: BSD, see LICENSE for details.
 """
 from contextlib import closing
 from datetime import datetime
+from time import sleep
 import csv
 import requests
 
 
 class ErplyException(Exception):
     pass
+
+class ErplyAPILimitException(ErplyException):
+    """Raised when Erply API limit (by default 1000 requests per hour) has
+    been exceeded.
+    """
 
 class ErplyAuth(object):
 
@@ -57,9 +63,14 @@ class Erply(object):
     ERPLY_CSV = ('getProductStockCSV', 'getSalesReport')
     ERPLY_POST = ('saveProduct',)
 
-    def __init__(self, auth):
+    def __init__(self, auth, wait_on_limit=False):
         self.auth = auth
         self._key = None
+
+        # Whether to wait for next hour when API limit has been met.
+        # When False, ErplyAPILimitException will be raised, otherwise
+        # request will be retried when new hour starts.
+        self.wait_on_limit = wait_on_limit
 
     @property
     def _payload(self):
@@ -119,9 +130,9 @@ class Erply(object):
             return False, data
 
         elif error == 1002:
-            # TODO: Add option to sleep until next hour
-            from datetime import datetime
-            from time import sleep
+            if not self.wait_on_limit:
+                raise ErplyAPILimitException
+
             # Calculate time to sleep until next hour
             server_time = datetime.fromtimestamp(status.get('requestUnixTime'))
             sleep((60 * (60 - server_time.minute)) + 1)
