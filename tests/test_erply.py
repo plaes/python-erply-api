@@ -124,9 +124,9 @@ class TestErply(unittest.TestCase):
 
         self.erply.getCustomers(**{'recordsOnPage': 1})
 
-        server_time = (60 * (60 - datetime.fromtimestamp(1470596233).minute)) + 1
+        sleep_seconds = (60 * (60 - datetime.fromtimestamp(1470596233).minute)) + 1
 
-        time_sleep.assert_called_once_with(server_time)
+        time_sleep.assert_called_once_with(sleep_seconds)
 
         assert m.call_count == 3
 
