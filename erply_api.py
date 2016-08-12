@@ -100,12 +100,6 @@ class Erply(object):
     def headers(self):
         return { 'Content-Type': 'application/x-www-form-urlencoded' }
 
-    def handle_csv(self, request, *args, **kwargs):
-        data = dict(request=request, responseType='CSV')
-        data.update(self.payload)
-        data.update(**kwargs)
-        return ErplyCSVResponse(self, requests.post(self.api_url, data=data, headers=self.headers))
-
     def _parse_response(self, resp, _initial_response=None):
         """Parse API response.
 
@@ -148,6 +142,18 @@ class Erply(object):
 
         raise ErplyException('Erply error: {}'.format(error))
 
+    def handle_csv(self, request, *args, **kwargs):
+        data = dict(request=request, responseType='CSV')
+        data.update(self.payload)
+        data.update(**kwargs)
+        r = requests.post(self.api_url, data=data, headers=self.headers)
+
+        retry, parsed_data = self._parse_response(r)
+        if retry:
+            return getattr(self, request)(request, *args, **kwargs)
+
+        return ErplyCSVResponse(self, parsed_data)
+
 
     def handle_get(self, request, _page=None, _response=None, *args, **kwargs):
         _is_bulk = kwargs.pop('_is_bulk', False)
@@ -157,6 +163,7 @@ class Erply(object):
         if _is_bulk:
             data.update(requestName=request)
             return data
+
         data.update(request=request)
         data.update(self.payload if request != 'verifyUser' else self._payload)
         r = requests.post(self.api_url, data=data, headers=self.headers)
@@ -283,31 +290,13 @@ class ErplyResponse(object):
 
 class ErplyCSVResponse(object):
 
-    def __init__(self, erply, response):
+    def __init__(self, erply, data):
         self.erply = erply
 
-        if response.status_code != requests.codes.ok:
-            print ('Request failed with error code {}'.format(response.status_code))
-            raise ValueError
-
-        data = response.json()
         status = data.get('status', {})
-        if not status:
-            print ("Malformed response")
-            raise ValueError
 
-        self.error = status.get('errorCode')
-
-        if self.error == 0:
-            self.url = data.get('records').pop().get('reportLink')
-            self.timestamp = datetime.fromtimestamp(status.get('requestUnixTime'))
-            return
-
-        field = status.get('errorField')
-        if field:
-            raise ErplyException('Erply error: {}, field: {}'.format(self.error, field))
-
-        raise ErplyException('Erply error{}'.format(self.error))
+        self.url = data.get('records').pop().get('reportLink')
+        self.timestamp = datetime.fromtimestamp(status.get('requestUnixTime'))
 
 
     @property

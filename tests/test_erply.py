@@ -132,15 +132,25 @@ class TestErply(unittest.TestCase):
 
     def test_hourly_limit_exception(self, m):
         _elim_response = json.dumps({'status': {'requestUnixTime': 1470596233, 'responseStatus': 'error', 'recordsInResponse': 0, 'request': 'verifyUser', 'generationTime': 0.00347900390625, 'errorCode': 1002, 'recordsTotal': 0}})
+        _elim_response_csv = json.dumps({'status': {'request': 'getSalesReport', 'recordsInResponse': 0, 'recordsTotal': 0, 'responseStatus': 'error', 'errorCode': 1002, 'generationTime': 0.0026440620422363, 'requestUnixTime': 1471017803}})
 
         m.post('https://{}.erply.com/api/'.format(self.ERPLY_CUSTOMER_CODE), [
             {'text': _elim_response},
+            {'text': _elim_response_csv},
         ])
+
+        self.erply._key = 'jVCn2ee69668699820b799fc80bc8a678e235fa3b363'
 
         with self.assertRaises(ErplyAPILimitException):
             self.erply.getCustomers(**{'recordsOnPage': 1})
 
         assert m.call_count == 1
+
+        with self.assertRaises(ErplyAPILimitException):
+            self.erply.getSalesReport(getCOGS=0, warehouseID=1, dateStart='2016-06-18', dateEnd='2016-06-18')
+
+        assert m.call_count == 2
+
 
 if __name__ == '__main__':
     unittest.main()
