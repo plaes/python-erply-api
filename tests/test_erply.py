@@ -110,14 +110,16 @@ class TestErply(unittest.TestCase):
     @mock.patch('erply_api.sleep', return_value=None)
     def test_hourly_limit(self, m, time_sleep):
         _elim_response = json.dumps({'status': {'requestUnixTime': 1470596233, 'responseStatus': 'error', 'recordsInResponse': 0, 'request': 'verifyUser', 'generationTime': 0.00347900390625, 'errorCode': 1002, 'recordsTotal': 0}})
-        _auth_response = json.dumps({"status":{"request":"verifyUser","requestUnixTime":1470506907,"responseStatus":"ok","errorCode":0,"generationTime":0.046638011932373,"recordsTotal":1,"recordsInResponse":1},"records":[{"userID":"6","userName":"demo","employeeID":"4","employeeName":"Clara Smith","groupID":"7","groupName":"sales representatives","sessionKey":"jVCn2ee69668699820b799fc80bc8a678e235fa3b363","sessionLength":3600,"loginUrl":"https:\/\/demo.erply.com\/eng\/","berlinPOSVersion":"3.17.2","berlinPOSAssetsURL":"http:\/\/assets.erply.com\/berlin\/","epsiURL":"https:\/\/app.erply.com\/epsi\/EPSI.jnlp"}]})
         _customer_1 = json.dumps({"status":{"request":"getCustomers","requestUnixTime":1470506908,"responseStatus":"ok","errorCode":0,"generationTime":0.10754203796387,"recordsTotal":15,"recordsInResponse":1},"records":[{"id":7}]})
+        _report_status = json.dumps({'status': {'generationTime': 0.074487924575806, 'recordsInResponse': 1, 'requestUnixTime': 1471021437, 'responseStatus': 'ok', 'errorCode': 0, 'request': 'getSalesReport', 'recordsTotal': 1}, 'records': [{'reportLink': 'https://t1.erply.com/actualreports/123_9aa0b4882da49edb7684e9e5e0144c65.csv'}]})
 
         m.post('https://{}.erply.com/api/'.format(self.ERPLY_CUSTOMER_CODE), [
             {'text': _elim_response},
-            {'text': _auth_response},
+            {'text': _customer_1},
+            {'text': _elim_response},
             {'text': _customer_1},
         ])
+        self.erply._key = 'jVCn2ee69668699820b799fc80bc8a678e235fa3b363'
 
         # Mark wait_on_limit to True
         self.erply.wait_on_limit = True
@@ -128,7 +130,19 @@ class TestErply(unittest.TestCase):
 
         time_sleep.assert_called_once_with(sleep_seconds)
 
-        assert m.call_count == 3
+        assert m.call_count == 2
+        assert m.request_history[1].text == m.request_history[1].text
+
+        # Try again..
+        time_sleep.reset_mock()
+        data = self.erply.getSalesReport(getCOGS=0, warehouseID=1, dateStart='2016-06-18', dateEnd='2016-06-18', reportType='SALES_BY_DATE')
+        sleep_seconds = (60 * (60 - datetime.fromtimestamp(1470596233).minute)) + 1
+
+        time_sleep.assert_called_once_with(sleep_seconds)
+
+        assert m.call_count == 4
+        assert m.request_history[2].text == m.request_history[3].text
+
 
     def test_hourly_limit_exception(self, m):
         _elim_response = json.dumps({'status': {'requestUnixTime': 1470596233, 'responseStatus': 'error', 'recordsInResponse': 0, 'request': 'verifyUser', 'generationTime': 0.00347900390625, 'errorCode': 1002, 'recordsTotal': 0}})

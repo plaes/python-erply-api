@@ -143,14 +143,14 @@ class Erply(object):
         raise ErplyException('Erply error: {}'.format(error))
 
     def handle_csv(self, request, *args, **kwargs):
-        data = dict(request=request, responseType='CSV')
+        data = dict(request=request.replace('CSV', ''), responseType='CSV')
         data.update(self.payload)
         data.update(**kwargs)
         r = requests.post(self.api_url, data=data, headers=self.headers)
 
         retry, parsed_data = self._parse_response(r)
         if retry:
-            return getattr(self, request)(request, *args, **kwargs)
+            return getattr(self, request)(*args, **kwargs)
 
         return ErplyCSVResponse(self, parsed_data)
 
@@ -172,7 +172,7 @@ class Erply(object):
 
         # Retry request in case of token expiration
         if retry:
-            return getattr(self, request)(request, _page=_page, _response=_response, *args, **kwargs)
+            return getattr(self, request)(_page=_page, _response=_response, *args, **kwargs)
 
         if _response:
             _response.populate_page(parsed_data.get('records'), _page)
@@ -220,7 +220,7 @@ class Erply(object):
             _attr = method
         elif attr in self.ERPLY_CSV:
             def method(*args, **kwargs):
-                return self.handle_csv(attr.replace('CSV', ''), *args, **kwargs)
+                return self.handle_csv(attr, *args, **kwargs)
             _attr = method
         if _attr:
             self.__dict__[attr] = _attr
