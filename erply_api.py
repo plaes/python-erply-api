@@ -63,7 +63,7 @@ class Erply(object):
     ERPLY_CSV = ('getProductStockCSV', 'getSalesReport')
     ERPLY_POST = ('saveProduct',)
 
-    def __init__(self, auth, wait_on_limit=False):
+    def __init__(self, auth, erply_api_url=None, wait_on_limit=False):
         self.auth = auth
         self._key = None
 
@@ -71,6 +71,9 @@ class Erply(object):
         # When False, ErplyAPILimitException will be raised, otherwise
         # request will be retried when new hour starts.
         self.wait_on_limit = wait_on_limit
+
+        # User-specified Erply API url
+        self.erply_api_url = erply_api_url
 
     @property
     def _payload(self):
@@ -94,7 +97,8 @@ class Erply(object):
 
     @property
     def api_url(self):
-        return 'https://{}.erply.com/api/'.format(self.auth.code)
+        return self.erply_api_url or \
+            'https://{}.erply.com/api/'.format(self.auth.code)
 
     @property
     def headers(self):

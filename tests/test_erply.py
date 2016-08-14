@@ -14,8 +14,28 @@ except ImportError:
     from urlparse import urlparse, parse_qs
 
 
-@requests_mock.Mocker()
 class TestErply(unittest.TestCase):
+
+    CUSTOMER_CODE = '12345'
+
+    def setUp(self):
+        self._auth = ErplyAuth(self.CUSTOMER_CODE, 'user', 'pass')
+
+    def test_erply_api_url(self):
+        erply = Erply(self._auth)
+
+        assert erply.api_url == 'https://{}.erply.com/api/'.format(self.CUSTOMER_CODE)
+
+    def test_erply_custom_api_url(self):
+        url = 'https://foo.com/xxx/'
+
+        erply = Erply(self._auth, erply_api_url=url)
+
+        assert erply.api_url == url
+
+
+@requests_mock.Mocker()
+class TestErplyIntegration(unittest.TestCase):
 
     # Default Erply Demo account credentials
     ERPLY_CUSTOMER_CODE = 'eng'
