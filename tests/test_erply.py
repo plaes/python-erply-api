@@ -175,13 +175,17 @@ class TestErplyIntegration(unittest.TestCase):
 
         self.erply._key = 'jVCn2ee69668699820b799fc80bc8a678e235fa3b363'
 
-        with self.assertRaises(ErplyAPILimitException):
+        with self.assertRaises(ErplyAPILimitException) as cm:
             self.erply.getCustomers(**{'recordsOnPage': 1})
+
+        self.assertEqual(cm.exception.server_time, datetime.fromtimestamp(1470596233))
 
         assert m.call_count == 1
 
-        with self.assertRaises(ErplyAPILimitException):
+        with self.assertRaises(ErplyAPILimitException) as cm:
             self.erply.getSalesReport(getCOGS=0, warehouseID=1, dateStart='2016-06-18', dateEnd='2016-06-18')
+
+        self.assertEqual(cm.exception.server_time, datetime.fromtimestamp(1471017803))
 
         assert m.call_count == 2
 

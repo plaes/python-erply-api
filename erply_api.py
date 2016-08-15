@@ -21,7 +21,12 @@ class ErplyException(Exception):
 class ErplyAPILimitException(ErplyException):
     """Raised when Erply API limit (by default 1000 requests per hour) has
     been exceeded.
+
+    :param server_time: Erply server time. Can be used to determine amount of
+    time until API accepts requests again.
     """
+    def __init__(self, server_time):
+        self.server_time = server_time
 
 class ErplyAuth(object):
 
@@ -128,11 +133,12 @@ class Erply(object):
             return False, data
 
         elif error == 1002:
+            server_time = datetime.fromtimestamp(status.get('requestUnixTime'))
+
             if not self.wait_on_limit:
-                raise ErplyAPILimitException
+                raise ErplyAPILimitException(server_time)
 
             # Calculate time to sleep until next hour
-            server_time = datetime.fromtimestamp(status.get('requestUnixTime'))
             sleep((60 * (60 - server_time.minute)) + 1)
             return True, None
 
