@@ -1,24 +1,34 @@
 # -*- coding: utf-8 -*-
-from datetime import timedelta
-from datetime import datetime
 """
     erply
     ~~~~~
 
     Simple Python wrapper for Erply API
 
-    :copyright: (c) 2014 by Priit Laes
+    :copyright: (c) 2014-2016 by Priit Laes
     :license: BSD, see LICENSE for details.
 """
 from contextlib import closing
 from datetime import datetime
+from time import sleep
 import csv
 import requests
 
 
 class ErplyException(Exception):
-    ###fcdsfsedcxwasd<zxcefdscx fdcx edscxzefdcsx f
     pass
+
+class ErplyAPILimitException(ErplyException):
+    """Raised when Erply API limit (by default 1000 requests per hour) has
+    been exceeded.
+
+    :param server_time: Erply server time. Can be used to determine amount of
+    time until API accepts requests again.
+    """
+    def __init__(self, server_time):
+        self.server_time = server_time
+
+class ErplyPermissionException(Exception):
 
 class ErplyAuth(object):
 
@@ -60,10 +70,17 @@ class Erply(object):
     ERPLY_CSV = ('getProductStockCSV', 'getSalesReport')
     ERPLY_POST = ('saveProduct',)
 
-    def __init__(self, auth):
+    def __init__(self, auth, erply_api_url=None, wait_on_limit=False):
         self.auth = auth
         self._key = None
-        self.valid_until = datetime.fromtimestamp(0)
+
+        # Whether to wait for next hour when API limit has been met.
+        # When False, ErplyAPILimitException will be raised, otherwise
+        # request will be retried when new hour starts.
+        self.wait_on_limit = wait_on_limit
+
+        # User-specified Erply API url
+        self.erply_api_url = erply_api_url
 
     @property
     def _payload(self):
@@ -77,34 +94,82 @@ class Erply(object):
                 print("Authentication failed with code {}".format(response.error))
                 raise ValueError
             key = response.fetchone().get('sessionKey', None)
-            print (key)
             self._key = key
-            self.valid_until = datetime.now() + timedelta(minutes=59, seconds=30)
             return key
         return self._key if self._key else authenticate()
 
     @property
     def payload(self):
-        #print ("now", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
-        print ("valid_until", self.valid_until)
-        if not datetime.now() < self.valid_until:
-            self._key = None
-            self.session
         return dict(sessionKey=self.session, **self._payload)
 
     @property
     def api_url(self):
-        return 'https://{}.erply.com/api/'.format(self.auth.code)
+        return self.erply_api_url or \
+            'https://{}.erply.com/api/'.format(self.auth.code)
 
     @property
     def headers(self):
-        return { 'Content-Type': 'application/x-www-form-urlencoded'}
+        return { 'Content-Type': 'application/x-www-form-urlencoded' }
+
+    def _parse_response(self, resp, _initial_response=None):
+        """Parse API response.
+
+        Returns two-tuple containing: `retry` and `data` values:
+            - `retry` is boolean specifying whether session token was expired
+              and signalling caller to request new session token and redo the
+              API with original parameters.
+            - `data` - dictionary of original json-encoded response.
+        """
+        if resp.status_code != requests.codes.ok:
+            raise ValueError('Request failed with error {}'.format(resp.status_code))
+
+        data = resp.json()
+        status = data.get('status', {})
+
+        if not status:
+            raise ValueError('Malformed response')
+
+        error = status.get('errorCode')
+
+        if error == 0:
+            return False, data
+
+        elif error == 1002:
+            server_time = datetime.fromtimestamp(status.get('requestUnixTime'))
+
+            if not self.wait_on_limit:
+                raise ErplyAPILimitException(server_time)
+
+            # Calculate time to sleep until next hour
+            sleep((60 * (60 - server_time.minute)) + 1)
+            return True, None
+
+        elif error == 1054:
+            self._key = None
+            return True, None
+
+        elif error == 1060:
+            """No viewing rights for this item."""
+            raise ErplyPermissionException()
+
+        field = status.get('errorField')
+        if field:
+            raise ErplyException('Erply error: {}, field: {}'.format(error, field))
+
+        raise ErplyException('Erply error: {}'.format(error))
 
     def handle_csv(self, request, *args, **kwargs):
-        data = dict(request=request, responseType='CSV')
+        data = dict(request=request.replace('CSV', ''), responseType='CSV')
         data.update(self.payload)
         data.update(**kwargs)
-        return ErplyCSVResponse(self, requests.post(self.api_url, data=data, headers=self.headers))
+        r = requests.post(self.api_url, data=data, headers=self.headers)
+
+        retry, parsed_data = self._parse_response(r)
+        if retry:
+            return getattr(self, request)(*args, **kwargs)
+
+        return ErplyCSVResponse(self, parsed_data)
+
 
     def handle_get(self, request, _page=None, _response=None, *args, **kwargs):
         _is_bulk = kwargs.pop('_is_bulk', False)
@@ -114,14 +179,22 @@ class Erply(object):
         if _is_bulk:
             data.update(requestName=request)
             return data
+
         data.update(request=request)
         data.update(self.payload if request != 'verifyUser' else self._payload)
         r = requests.post(self.api_url, data=data, headers=self.headers)
-        #print (r.headers['Date'])
+
+        retry, parsed_data = self._parse_response(r)
+
+        # Retry request in case of token expiration
+        if retry:
+            return getattr(self, request)(_page=_page, _response=_response, *args, **kwargs)
+
         if _response:
-            _response.populate_page(r, _page)
-        ErplyResponse.serverDate(self, r)
-        return ErplyResponse(self, r, request, _page, *args, **kwargs)
+            _response.populate_page(parsed_data.get('records'), _page)
+
+        return ErplyResponse(self, parsed_data, request, _page, *args, **kwargs)
+
 
     def handle_post(self, request, *args, **kwargs):
         _is_bulk = kwargs.pop('_is_bulk', False)
@@ -132,10 +205,14 @@ class Erply(object):
         data.update(request=request)
         data.update(self.payload)
         r = requests.post(self.api_url, data=data, headers=self.headers)
-        print (r.headers['Date'])
-        
-        
-        return ErplyResponse(self, r, request, *args, **kwargs)
+
+        retry, parsed_data = self._parse_response(r)
+
+        # Retry request in case of token expiration
+        if retry:
+            return getattr(self, request)(request, *args, **kwargs)
+
+        return ErplyResponse(self, parsed_data, request, *args, **kwargs)
 
     def handle_bulk(self, _requests):
         data = self.payload
@@ -149,8 +226,8 @@ class Erply(object):
             attr = attr[:-5]
         if attr in self.ERPLY_GET:
             def method(*args, **kwargs):
-                _page = kwargs.get('_page', 0)
-                _response = kwargs.get('_response', None)
+                _page = kwargs.pop('_page', 0)
+                _response = kwargs.pop('_response', None)
                 return self.handle_get(attr, _page, _response, _is_bulk=_is_bulk, *args, **kwargs)
             _attr = method
         elif attr in self.ERPLY_POST:
@@ -159,7 +236,7 @@ class Erply(object):
             _attr = method
         elif attr in self.ERPLY_CSV:
             def method(*args, **kwargs):
-                return self.handle_csv(attr.replace('CSV', ''), *args, **kwargs)
+                return self.handle_csv(attr, *args, **kwargs)
             _attr = method
         if _attr:
             self.__dict__[attr] = _attr
@@ -188,11 +265,10 @@ class ErplyBulkRequest(object):
 
 class ErplyResponse(object):
 
-    def __init__(self, erply, response, request, page=0, *args, **kwargs):
+    def __init__(self, erply, data, request, page=0, *args, **kwargs):
         self.request = request
         self.erply = erply
         self.error = None
-        self.response = response
 
         # Result pagination setup
         self.page = page
@@ -200,29 +276,10 @@ class ErplyResponse(object):
 
         self.kwargs = kwargs
 
-        if response.status_code != requests.codes.ok:
-            print ('Request failed with error code {}'.format(response.status_code))
-            raise ValueError
-
-        data = response.json()
         status = data.get('status', {})
 
-        if not status:
-            print ("Malformed response")
-            raise ValueError
-
-        self.error = status.get('errorCode')
-
-        if self.error == 0:
-            self.total = status.get('recordsTotal')
-            self.records = { page: data.get('records')}
-            return
-
-        field = status.get('errorField')
-        if field:
-            raise ErplyException('{}, field: {}'.format(self.error, field))
-
-        raise ErplyException('{}'.format(self.error))
+        self.total = status.get('recordsTotal')
+        self.records = { page: data.get('records')}
 
 
     def fetchone(self):
@@ -233,16 +290,10 @@ class ErplyResponse(object):
     def fetch_records(self, page):
         self.erply.handle_get(self.request, _page=page, _response=self, **self.kwargs)
 
-    def populate_page(self, response, page):
-        items = response.json().get('records')
-        if items:
-            assert self.per_page != 0
-            self.records[page] = items
-    
-    def serverDate(self, response):
-        unixDate = response.json().get('status').get('requestUnixTime')
-        return {'UnixTime': unixDate}
-    
+    def populate_page(self, data, page):
+        assert self.per_page != 0
+        self.records[page] = data
+
     def __getitem__(self, key):
         if isinstance(key, slice):
             raise NotImplementedError
@@ -255,31 +306,13 @@ class ErplyResponse(object):
 
 class ErplyCSVResponse(object):
 
-    def __init__(self, erply, response):
+    def __init__(self, erply, data):
         self.erply = erply
 
-        if response.status_code != requests.codes.ok:
-            print ('Request failed with error code {}'.format(response.status_code))
-            raise ValueError
-
-        data = response.json()
         status = data.get('status', {})
-        if not status:
-            print ("Malformed response")
-            raise ValueError
 
-        self.error = status.get('errorCode')
-
-        if self.error == 0:
-            self.url = data.get('records').pop().get('reportLink')
-            self.timestamp = datetime.fromtimestamp(status.get('requestUnixTime'))
-            return
-
-        field = status.get('errorField')
-        if field:
-            raise ErplyException('{}, field: {}'.format(self.error, field))
-
-        raise ErplyException('{}'.format(self.error))
+        self.url = data.get('records').pop().get('reportLink')
+        self.timestamp = datetime.fromtimestamp(status.get('requestUnixTime'))
 
 
     @property
