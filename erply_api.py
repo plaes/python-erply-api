@@ -108,12 +108,8 @@ class Erply(object):
         return self.erply_api_url or \
             'https://{}.erply.com/api/'.format(self.auth.code)
 
-    @property
-    def headers(self):
-        return { 'Content-Type': 'application/x-www-form-urlencoded' }
-
-    def _parse_response(self, resp, _initial_response=None):
-        """Parse API response.
+    def _erply_query(self, data, _initial_response=None):
+        """Send request to Erply API and parse response.
 
         Returns two-tuple containing: `retry` and `data` values:
             - `retry` is boolean specifying whether session token was expired
@@ -121,6 +117,10 @@ class Erply(object):
               API with original parameters.
             - `data` - dictionary of original json-encoded response.
         """
+        headers = {'Content-Type': 'application/x-www-form-urlencoded'}
+
+        resp = requests.post(self.api_url, data=data, headers=headers)
+
         if resp.status_code != requests.codes.ok:
             raise ValueError('Request failed with error {}'.format(resp.status_code))
 
@@ -163,9 +163,8 @@ class Erply(object):
         data = dict(request=request.replace('CSV', ''), responseType='CSV')
         data.update(self.payload)
         data.update(**kwargs)
-        r = requests.post(self.api_url, data=data, headers=self.headers)
 
-        retry, parsed_data = self._parse_response(r)
+        retry, parsed_data = self._erply_query(data)
         if retry:
             return getattr(self, request)(*args, **kwargs)
 
@@ -183,9 +182,8 @@ class Erply(object):
 
         data.update(request=request)
         data.update(self.payload if request != 'verifyUser' else self._payload)
-        r = requests.post(self.api_url, data=data, headers=self.headers)
 
-        retry, parsed_data = self._parse_response(r)
+        retry, parsed_data = self._erply_query(data)
 
         # Retry request in case of token expiration
         if retry:
@@ -205,9 +203,8 @@ class Erply(object):
             return data
         data.update(request=request)
         data.update(self.payload)
-        r = requests.post(self.api_url, data=data, headers=self.headers)
 
-        retry, parsed_data = self._parse_response(r)
+        retry, parsed_data = self._erply_query(data)
 
         # Retry request in case of token expiration
         if retry:
