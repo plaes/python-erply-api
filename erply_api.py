@@ -28,7 +28,7 @@ class ErplyAPILimitException(ErplyException):
     def __init__(self, server_time):
         self.server_time = server_time
 
-class ErplyPermissionException(Exception):
+class ErplyPermissionException(ErplyException):
     """No viewing rights for this item."""
 
 class ErplyAuth(object):
