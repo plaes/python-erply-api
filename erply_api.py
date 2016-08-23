@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-    erply
-    ~~~~~
+    ErplyAPI
+    ~~~~~~~~
 
     Simple Python wrapper for Erply API
 
@@ -14,6 +14,18 @@ from time import sleep
 import csv
 import requests
 
+import logging
+
+try:
+    # Python 2.7
+    from logging import NullHandler
+except ImportError:
+    class NullHandler:
+        def emit(self, record):
+            pass
+
+logger = logging.getLogger(__name__)
+logger.addHandler(NullHandler())
 
 class ErplyException(Exception):
     pass
@@ -92,7 +104,7 @@ class Erply(object):
         def authenticate():
             response = self.verifyUser(**self.auth.data)
             if response.error:
-                print("Authentication failed with code {}".format(response.error))
+                logger.exception("Authentication failed with code {}".format(response.error))
                 raise ValueError
             key = response.fetchone().get('sessionKey', None)
             self._key = key
@@ -119,6 +131,7 @@ class Erply(object):
         """
         headers = {'Content-Type': 'application/x-www-form-urlencoded'}
 
+        logger.debug('Erply request %s', data.get('request'))
         resp = requests.post(self.api_url, data=data, headers=headers)
 
         if resp.status_code != requests.codes.ok:
@@ -141,16 +154,21 @@ class Erply(object):
             if not self.wait_on_limit:
                 raise ErplyAPILimitException(server_time)
 
+            sleep_time = (60 * (60 - server_time.minute)) + 1
+            logger.info('Hourly API limit exceeded, sleeping for %d seconds' % sleep_time)
+
             # Calculate time to sleep until next hour
-            sleep((60 * (60 - server_time.minute)) + 1)
+            sleep(sleep_time)
             return True, None
 
         elif error == 1054:
             self._key = None
+            logger.info('Retrying API call...')
             return True, None
 
         elif error == 1060:
             # No viewing rights for this item
+            logger.info('Permission denied for this resource')
             raise ErplyPermissionException()
 
         field = status.get('errorField')
