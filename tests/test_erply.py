@@ -161,7 +161,10 @@ class TestErplyIntegration(unittest.TestCase):
         time_sleep.assert_called_once_with(sleep_seconds)
 
         assert m.call_count == 4
-        assert m.request_history[2].text == m.request_history[3].text
+        self.assertDictEqual(
+            parse_qs(m.request_history[2].text),
+            parse_qs(m.request_history[3].text),
+        )
 
 
     def test_hourly_limit_exception(self, m):
