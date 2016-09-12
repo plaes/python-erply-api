@@ -333,6 +333,7 @@ class ErplyCSVResponse(object):
 
     @property
     def records(self):
+        # TODO: Rework so we can use proper iterator...
         with closing(requests.get(self.url, stream=True)) as f:
             if f.status_code != requests.codes.ok:
                 raise ValueError
@@ -342,6 +343,7 @@ class ErplyCSVResponse(object):
 
 
 class ErplyBulkResponse(object):
+    # TODO: This class will be reworked in the future..
     def __init__(self, erply, response):
         if response.status_code != requests.codes.ok:
             print ('Request failed with error code {}'.format(response.status_code))
