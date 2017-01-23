@@ -8,11 +8,11 @@ python:
     - "3.3"
     - "3.4"
     - "3.5"
-    - "3.5-dev"
+    - "3.5"
+    - "3.6"
     - "3.6-dev"
+    - "3.7-dev"
     - "nightly"
-    # Python 3.6 is not yet available
-    # - "3.6"
     ## cryptography-1.0 is not compatible with PyPy < 2.6.
     ## https://github.com/travis-ci/travis-ci/issues/4756
     # - "pypy"
