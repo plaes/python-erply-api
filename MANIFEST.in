@@ -1,1 +1,4 @@
 include Makefile AUTHORS LICENSE README
+include tox.ini
+include requirements-dev.txt
+global-exclude *.pyc
