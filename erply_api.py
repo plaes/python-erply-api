@@ -2,9 +2,7 @@
 """
     ErplyAPI
     ~~~~~~~~
-
     Simple Python wrapper for Erply API
-
     :copyright: (c) 2014-2016 by Priit Laes
     :license: BSD, see LICENSE for details.
 """
@@ -33,7 +31,6 @@ class ErplyException(Exception):
 class ErplyAPILimitException(ErplyException):
     """Raised when Erply API limit (by default 1000 requests per hour) has
     been exceeded.
-
     :param server_time: Erply server time. Can be used to determine amount of
     time until API accepts requests again.
     """
@@ -67,21 +64,26 @@ class Erply(object):
         ,'getEmployees'
         ,'getProducts'
         ,'getProductCategories'
-        ,'getProductCostForSpecificAmount'     # untested
+        ,'getProductCostForSpecificAmount'  
         ,'getProductGroups'
-        ,'getProductPrices'                    # untested, broken ??
-        ,'getProductPriorityGroups'            # untested
-        ,'getProductStock'                     # untested
+        ,'getProductPrices'               
+        ,'getProductPriorityGroups'          
+        ,'getProductStock'                    
         ,'getProductUnits'
         ,'getPurchaseDocuments'
         ,'getReports'
         ,'getSalesDocuments'
         ,'getServices'
         ,'getWarehouses'
+        ,'getAllowedWarehouses'
         ,'verifyUser'
+        ,'getCampaigns'
+        ,'getStocktakings'
+        ,'getAccountStatements'
+        ,'getCostOfGoodsSold'
     )
-    ERPLY_CSV = ('getProductStockCSV', 'getSalesReport')
-    ERPLY_POST = ('saveProduct',)
+    ERPLY_CSV = ('getProductStockCSV', 'getSalesReport','getPurchaseReport')
+    ERPLY_POST = ('saveProduct')
 
     def __init__(self, auth, erply_api_url=None, wait_on_limit=False):
         self.auth = auth
@@ -122,7 +124,6 @@ class Erply(object):
 
     def _erply_query(self, data, _initial_response=None):
         """Send request to Erply API and parse response.
-
         Returns two-tuple containing: `retry` and `data` values:
             - `retry` is boolean specifying whether session token was expired
               and signalling caller to request new session token and redo the
